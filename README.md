@@ -47,7 +47,7 @@ To enable **Live AI**, copy `.env.example` to `.env`, paste a free Groq key afte
 pytest
 ```
 
-191 tests, about 3 seconds. No test calls a real AI provider: models are replaced by fakes. A fixture
+193 tests, about 3 seconds. No test calls a real AI provider: models are replaced by fakes. A fixture
 isolates the suite from your `.env`: provider keys are blanked, and tuning values and match weights are
 reset to the code defaults, so local settings cannot change test results.
 
