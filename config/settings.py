@@ -1,6 +1,7 @@
 """Django settings. All deployment-sensitive values come from environment variables."""
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -26,7 +27,22 @@ if not SECRET_KEY:
     else:
         raise RuntimeError("DJANGO_SECRET_KEY must be set when DEBUG is off.")
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+def env_list(name: str, default: str = "") -> list[str]:
+    return [v.strip() for v in os.environ.get(name, default).split(",") if v.strip()]
+
+
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
+# Full origins (scheme + host) allowed to send POST/DELETE, e.g. https://my-app.vercel.app
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+
+# Vercel sets VERCEL=1 and the deployment's own host names; allow them without extra setup.
+ON_VERCEL = os.environ.get("VERCEL") == "1"
+if ON_VERCEL:
+    for var in ("VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        host = os.environ.get(var, "").strip()
+        if host:
+            ALLOWED_HOSTS.append(host)
+            CSRF_TRUSTED_ORIGINS.append(f"https://{host}")
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -42,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # serves /static/ (Vercel has no separate static server)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -69,12 +86,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=0,
-    )
-}
+# DATABASE_URL (e.g. Neon Postgres) or local SQLite. conn_max_age=0: serverless functions should not hold
+# connections open; use Neon's pooled ("-pooler") host. The test suite always uses its own SQLite database.
+TESTING = "pytest" in sys.modules
+if TESTING:
+    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "test_db.sqlite3"}}
+else:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+            conn_max_age=0,
+            conn_health_checks=True,
+        )
+    }
+    if "postgresql" in DATABASES["default"]["ENGINE"]:
+        DATABASES["default"].setdefault("OPTIONS", {}).setdefault("sslmode", "require")  # Neon needs TLS
+    if ON_VERCEL and DATABASES["default"]["ENGINE"].endswith("sqlite3"):
+        raise RuntimeError("DATABASE_URL must be set on Vercel: its disk is read-only and not kept between requests.")
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
@@ -83,6 +111,19 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# WhiteNoise serves straight from static/ (no collectstatic build step, no STATIC_ROOT); ?v= busts caches.
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = DEBUG
+
+# --- HTTPS / cookies: on whenever DEBUG is off (always the case on Vercel) ---
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 3600, min_value=0, max_value=63_072_000)
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

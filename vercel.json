@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "includeFiles": "{config,ai,matching,opportunities,profiles,shortlist,static,templates}/**"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index?__path=/$1" }]
+}

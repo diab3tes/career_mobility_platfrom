@@ -132,6 +132,34 @@ code { font-size: .85em; background: var(--surface-2); padding: 1px 6px; border-
 
 .theme { padding: 3px; }
 .theme button { width: 34px; height: 28px; padding: 0; justify-content: center; }
+
+/* Header on small screens: two rows. Row 1: logo + toggles. Row 2: the page links as one strip that
+   scrolls sideways instead of wrapping, so the sticky header stays short. */
+@media (max-width: 760px) {
+  .site .wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; min-height: 0; padding-top: 10px; padding-bottom: 6px; }
+  .brand { grid-column: 1; grid-row: 1; min-width: 0; font-size: .95rem; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 9px; flex: none; }
+  .tools { grid-column: 2; grid-row: 1; margin-left: 0; gap: 6px; flex-wrap: nowrap; }
+  .aimode .lock { display: none; } /* still explained by the disabled button's tooltip and screen-reader text */
+  .seg button { padding: 6px 9px; font-size: .78rem; }
+  .theme button { width: 30px; height: 26px; }
+  .nav {
+    grid-column: 1 / -1; grid-row: 2; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -16px; padding: 2px 16px 4px; scroll-padding-inline: 16px;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 24px), transparent);
+            mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 24px), transparent);
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { flex: none; white-space: nowrap; padding: 6px 12px; }
+}
+@media (max-width: 760px) {
+  .brand > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* Phones: the logo mark alone (the words stay available to screen readers via aria-label). */
+@media (max-width: 480px) {
+  .brand > span:last-child { display: none; }
+  .seg button .led { display: none; }
+}
 .theme button[aria-pressed="true"] {
   background: linear-gradient(180deg, #ffc548, #f2a51a); color: #5a3a00; box-shadow: 0 4px 12px -4px rgba(242, 165, 26, .7);
 }
