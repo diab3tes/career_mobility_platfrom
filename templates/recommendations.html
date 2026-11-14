@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Your matches · Career Mobility{% endblock %}
+{% block content %}
+<header class="page-head">
+  <span class="step"><span class="n">02 /</span> Matches</span>
+  <div class="row">
+    <h1>Your matches, ranked</h1>
+  </div>
+  <p class="lede">Each score is 0–100 from six weighted rules: skills, experience, language, location, education and interests. The same profile always gives the same order. Eligibility is a separate label and never a statement about your legal right to work.</p>
+</header>
+
+{{ initial|json_script:"initial-data" }}
+<div id="root"><div class="card muted">Loading your matches…</div></div>
+<noscript><div class="card">This page needs JavaScript. You can still browse <a href="{% url 'opportunity_list' %}">all opportunities</a>.</div></noscript>
+
+{# Prototype choice: React and Babel from a CDN with in-browser JSX compilation. A production build would use a bundler. #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js" crossorigin="anonymous"></script>
+<script type="text/babel" data-presets="react" src="{% static 'js/recommendations.jsx' %}?v={{ static_v }}"></script>
+{% endblock %}

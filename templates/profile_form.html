@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Your profile · Career Mobility{% endblock %}
+{% block content %}
+<header class="page-head">
+  <span class="step"><span class="n">01 /</span> Profile</span>
+  <h1>Build your career profile</h1>
+  <p class="lede">Your matches are scored from these details. Type them in, start from the sample candidate, or pre-fill the form from a CV and check it.</p>
+</header>
+
+<section class="panel split tilt reveal" data-tilt="1.5" aria-label="Ways to start">
+  <div class="sec" style="display:grid; gap:18px; align-content:start">
+    <div>
+      <h2>Try it in one click</h2>
+      <p class="muted" style="margin-top:6px">A sample candidate based on the brief: a business graduate with three years in operations, looking at Germany, Canada and Singapore.</p>
+    </div>
+    <div class="upload-row">
+      <a class="btn btn-primary" href="?sample=1">Load sample profile</a>
+      {% if has_profile %}<span class="status ok">Profile saved</span>{% endif %}
+    </div>
+    <ul class="reasons" style="margin:0">
+      <li class="plus"><span>No account: the profile belongs to this browser session.</span></li>
+      <li class="plus"><span>Nothing is saved until you press <b>Save profile</b>.</span></li>
+      <li class="unk"><span>Work authorisation and student status are never assumed. Unanswered, they show as “requires verification”.</span></li>
+      <li class="plus"><span>Your data is deleted after {{ retention_days }} days without a visit, or straight away with <b>Delete my data</b>.</span></li>
+    </ul>
+  </div>
+
+  <div class="sec" style="display:grid; gap:14px; align-content:start" aria-labelledby="cv-h">
+    <div>
+      <h2 id="cv-h">Pre-fill from a CV</h2>
+      <p class="muted" style="margin-top:6px">Text-based PDF up to {{ cv_max_mb }} MB. Scanned or image-only PDFs can't be read. The file is not stored.</p>
+    </div>
+
+    <div class="dots pipe" aria-label="How a CV becomes a profile">
+      <ol>
+        <li class="node"><span class="k">Upload</span>Your PDF</li>
+        <li class="node"><span class="k">Check</span>Enough text?</li>
+        <li class="node ai"><span class="k">{% if ai_mode == "live" %}{{ ai_provider_label }}{% else %}Mock AI{% endif %}</span>Extract fields</li>
+        <li class="node you"><span class="k">You</span>Review, save</li>
+      </ol>
+    </div>
+
+    <p class="privacy">
+      {% if ai_mode == "live" %}
+        <span><strong>Live AI is on.</strong> The text of your CV is sent to {{ ai_provider_label }} ({{ ai_model }}) to extract your profile. Do not upload real personal data to this demo.{% if ai_live_remaining is not None %} Live AI calls left this session: {{ ai_live_remaining }}.{% endif %}</span>
+      {% else %}
+        <span><strong>Mock AI is on.</strong> Your CV is checked here but not read by a model; the brief's sample profile is shown instead. Do not upload real personal data to this demo.</span>
+      {% endif %}
+    </p>
+
+    <form method="post" action="{% url 'cv_upload' %}" enctype="multipart/form-data" class="upload-row">
+      {% csrf_token %}
+      <input type="file" name="cv" accept=".pdf,application/pdf" required aria-label="CV file (PDF)">
+      <button type="submit" class="btn">Upload and pre-fill</button>
+      {% if ai_mode == "live" %}
+        <label class="consent">
+          <input type="checkbox" name="consent" value="yes" required>
+          <span>I agree that the text of my CV is sent to {{ ai_provider_label }} ({{ ai_model }}) to pre-fill my profile.
+            Email addresses, phone numbers and links are removed first.</span>
+        </label>
+      {% endif %}
+    </form>
+    {% if cv_error %}<div class="flash error" role="alert" style="margin:0">{{ cv_error }}</div>{% endif %}
+  </div>
+</section>
+
+<div style="height:28px"></div>
+
+{% if cv_result %}
+  <div class="flash {% if cv_result.source == 'live' %}success{% else %}mock{% endif %}" role="status">
+    <span>
+      {% if cv_result.source == "live" %}
+        <strong>Live AI output</strong>{% if cv_result.model_id %} ({{ cv_result.model_id }}){% endif %}: {{ cv_result.filled_count }} field{{ cv_result.filled_count|pluralize }} filled from your CV.
+        {% if cv_result.notice %}{{ cv_result.notice }}{% endif %}
+      {% else %}
+        <strong>{{ cv_result.notice }}</strong>
+      {% endif %}
+      Nothing is saved yet: check every field, fill the gaps, then press Save profile.
+    </span>
+  </div>
+{% endif %}
+
+{% if form.non_field_errors %}<div class="flash error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+<form method="post" action="{% url 'profile_form' %}" novalidate class="panel reveal" style="--i: 2">
+  {% csrf_token %}
+
+  <section class="sec">
+    <div class="sec-title"><h2>Education and experience</h2><p>Skills count {{ weights.Skills }}, experience {{ weights.Experience }} and education {{ weights.Education }} of {{ weight_total }} weight points.</p></div>
+    <div class="form-grid">
+      {% include "_field.html" with field=form.education_level %}
+      {% include "_field.html" with field=form.education_field %}
+      {% include "_field.html" with field=form.years_experience %}
+    </div>
+    {% include "_field.html" with field=form.skills %}
+    {% include "_field.html" with field=form.experience_areas %}
+  </section>
+
+  <section class="sec">
+    <div class="sec-title">
+      <h2>Languages
+        {% if cv_result %}{% if cv_result.languages_filled %}<span class="badge filled">AI-filled: check</span>{% else %}<span class="badge empty">Not found in CV</span>{% endif %}{% endif %}
+      </h2>
+      <p>Add each language you speak with its level. Some roles make a language mandatory.</p>
+    </div>
+    {{ langs.management_form }}
+    {% for e in langs.non_form_errors %}<div class="flash error" role="alert">{{ e }}</div>{% endfor %}
+    <div id="lang-rows" data-prefix="{{ langs.prefix }}" data-max="{{ langs.max_num }}">
+      {% for lf in langs %}
+        <div class="langrow">
+          {% include "_field.html" with field=lf.language %}
+          {% include "_field.html" with field=lf.level %}
+          <button type="button" class="icon-btn row-remove" data-remove-lang aria-label="Remove this language" title="Remove" hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+      {% endfor %}
+    </div>
+    {# Blank row cloned by profile_form.js; __prefix__ is replaced with the next form index. #}
+    <template id="lang-template">
+      <div class="langrow">
+        {% include "_field.html" with field=langs.empty_form.language %}
+        {% include "_field.html" with field=langs.empty_form.level %}
+        <button type="button" class="icon-btn row-remove" data-remove-lang aria-label="Remove this language" title="Remove">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+    </template>
+    <div class="upload-row">
+      <button type="button" class="btn btn-sm" id="add-lang" hidden>+ Add language</button>
+      <span class="muted small" id="lang-limit" hidden>You can add up to {{ langs.max_num }} languages.</span>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-title"><h2>Where and what</h2><p>Location counts {{ weights.Location }} and interests {{ weights.Interests }} of {{ weight_total }} weight points.</p></div>
+    <div class="form-grid">
+      {% include "_field.html" with field=form.preferred_countries %}
+      {% include "_field.html" with field=form.career_interests %}
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-title"><h2>Eligibility details</h2><p>Optional and never part of the score. Roles that need them are labelled separately.</p></div>
+    <div class="form-grid">
+      {% include "_field.html" with field=form.currently_enrolled_student %}
+      {% include "_field.html" with field=form.work_authorisation_status %}
+    </div>
+    {% include "_field.html" with field=form.work_authorisation %}
+  </section>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Save profile</button>
+    <span class="muted small">Saving takes you to your ranked matches.</span>
+  </div>
+</form>
+
+{% if has_profile %}
+<section class="panel sec data-card" aria-labelledby="data-h">
+  <div>
+    <h2 id="data-h">Your data</h2>
+    <p class="muted" style="margin-top:6px">Delete your profile, shortlist and saved AI assessments from this server now.
+      Otherwise they are deleted automatically after {{ retention_days }} days without a visit. This cannot be undone.</p>
+  </div>
+  <form method="post" action="{% url 'delete_my_data' %}"
+        onsubmit="return confirm('Delete your profile, shortlist and saved AI assessments? This cannot be undone.');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Delete my data</button>
+  </form>
+</section>
+{% endif %}
+<script src="{% static 'js/profile_form.js' %}?v={{ static_v }}" defer></script>
+{% endblock %}

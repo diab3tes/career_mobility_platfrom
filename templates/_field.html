@@ -1,0 +1,10 @@
+<div class="field{% if field.errors %} has-error{% endif %}{% if field.field.ai_state %} ai-{{ field.field.ai_state }}{% endif %}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="req" aria-hidden="true">*</span>{% endif %}
+    {% if field.field.ai_state == "filled" %}<span class="badge filled">AI-filled: check</span>
+    {% elif field.field.ai_state == "empty" %}<span class="badge empty">Not found in CV</span>
+    {% elif field.field.ai_state == "never" %}<span class="badge never">Never taken from a CV</span>{% endif %}
+  </label>
+  {{ field }}
+  {% if field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
+  {% for e in field.errors %}<div class="err" role="alert">{{ e }}</div>{% endfor %}
+</div>

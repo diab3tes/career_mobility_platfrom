@@ -1,0 +1,11 @@
+Django>=5.2,<5.3
+pydantic>=2.7
+dj-database-url>=2.2
+python-dotenv>=1.0
+pypdf>=5.0
+langchain>=1.0,<2
+langchain-groq>=1.1,<2
+langchain-cloudflare>=0.4,<1
+langchain-ibm>=1.0,<2  # only for AI_PROVIDER=watsonx
+pytest>=8.0
+pytest-django>=4.8

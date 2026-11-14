@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Shortlist · Career Mobility{% endblock %}
+{% block content %}
+<header class="page-head">
+  <span class="step"><span class="n">03 /</span> Shortlist</span>
+  <h1>Your shortlist</h1>
+  <p class="lede">Roles you saved, with their current score. Open one for its full breakdown and AI second opinion. Scores update if you change your profile.</p>
+</header>
+
+{{ initial|json_script:"initial-data" }}
+{# Server-rendered list: shown until React starts, and as the whole page without JavaScript. #}
+<div id="root">
+{% if not has_profile %}
+  <section class="panel empty tilt reveal" data-tilt="3">
+    <span class="status neutral">No profile yet</span>
+    <h2>Create a profile first</h2>
+    <p class="muted">Then save roles from your matches and they will appear here.</p>
+    <a class="btn btn-primary" href="{% url 'profile_form' %}">Create a profile</a>
+  </section>
+{% else %}
+  <div class="recs">
+  {% for row in rows %}
+    <article class="rec tilt reveal" data-tilt="4" style="--i: {{ forloop.counter0 }}">
+      <div class="ring {% if row.match.score >= 75 %}hi{% elif row.match.score >= 50 %}mid{% else %}lo{% endif %}" style="--p: {{ row.match.score }}" role="img" aria-label="Score {{ row.match.score }} out of 100">
+        <svg viewBox="0 0 80 80" aria-hidden="true"><circle class="track" cx="40" cy="40" r="34" pathLength="100"/><circle class="val" cx="40" cy="40" r="34" pathLength="100"/></svg>
+        <div class="num"><span>{{ row.match.score }}<small>/100</small></span></div>
+      </div>
+      <div style="min-width:0">
+        <h2>{{ row.o.title }}</h2>
+        <div class="where">{{ row.o.organisation }} · {% if row.o.city %}{{ row.o.city }}, {% endif %}{{ row.o.country }} · {{ row.o.get_type_display }}</div>
+        <div class="labels"><span class="status {{ row.match.eligibility }}">{{ row.match.eligibility_label }}</span></div>
+        {% for n in row.match.eligibility_notes %}<div class="note {% if row.match.eligibility == 'blocker' %}blocker{% elif row.match.eligibility == 'no_stated_constraint' %}ok{% endif %}">{{ n }}</div>{% endfor %}
+        <div class="actions" style="align-items:center">
+          <form method="post" action="{% url 'shortlist_remove' row.o.pk %}">{% csrf_token %}<button type="submit" class="btn btn-sm">Remove</button></form>
+          <span class="muted small">Saved {{ row.item.created_at|date:"j M Y, H:i" }}</span>
+        </div>
+      </div>
+    </article>
+  {% empty %}
+    <section class="panel empty tilt reveal" data-tilt="3">
+      <span class="status neutral">Empty</span>
+      <h2>Nothing saved yet</h2>
+      <p class="muted">Use Save on any of your matches to keep it here.</p>
+      <a class="btn btn-primary" href="{% url 'recommendations' %}">Go to your matches</a>
+    </section>
+  {% endfor %}
+  </div>
+{% endif %}
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js" crossorigin="anonymous"></script>
+<script type="text/babel" data-presets="react" src="{% static 'js/recommendations.jsx' %}?v={{ static_v }}"></script>
+{% endblock %}
