@@ -6,5 +6,5 @@
       "includeFiles": "{config,ai,matching,opportunities,profiles,shortlist,static,templates}/**"
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index?__path=/$1" }]
 }
