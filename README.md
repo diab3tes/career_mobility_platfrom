@@ -17,8 +17,11 @@ python -m venv .venv
 Activate it (Windows: `.venv\Scripts\activate`; macOS/Linux: `source .venv/bin/activate`), then:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
+
+(`requirements.txt` holds only the runtime packages, which is what Vercel installs; `requirements-dev.txt`
+adds pytest and the optional watsonx provider.)
 
 ```bash
 python manage.py migrate
@@ -92,7 +95,9 @@ example file ships with, where it differs.
 | `DJANGO_SECRET_KEY` | dev-only key when `DEBUG` is on | `change-me` | Required when `DEBUG` is off |
 | `DEBUG` | true | | |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | | |
-| `DATABASE_URL` | SQLite file in the project | | Any `dj-database-url` URL |
+| `CSRF_TRUSTED_ORIGINS` | none | | Comma-separated `https://` origins; Vercel's own URLs are added automatically |
+| `DATABASE_URL` | SQLite file in the project | | Any `dj-database-url` URL, e.g. Neon Postgres (`sslmode=require` is added if missing). The test suite always uses its own SQLite database |
+| `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS` | true, 3600 | | Only when `DEBUG` is off (HTTPS redirect, HSTS, secure cookies are then on) |
 | `AI_PROVIDER` | `groq` | | `groq`, `cloudflare` or `watsonx` |
 | Provider keys and model | none | models pre-filled | See [Provider](#provider); the model is required |
 | `GROQ_REASONING_EFFORT` | blank (not sent) | `low` | Reasoning models only: `low`, `medium`, `high` |
@@ -356,6 +361,44 @@ labelled "Mock AI output".
 | Separation between visitors | Every view finds the visitor's profile only through the server-side session (database-backed; the browser holds just a random, HttpOnly, SameSite=Lax session key). The only id in URLs is the opportunity id, and opportunities are public. Shortlist items and saved AI assessments are always filtered by the session's profile, and every change needs a CSRF token. `tests/test_isolation.py` has a second visitor call every page and endpoint and checks they can neither see nor change the first visitor's data, and that a `profile_id` in the URL is ignored |
 | Logging | No CV text or profile data is logged; only the error message when the AI falls back |
 
+## Deploying to Vercel (free plan) with Neon Postgres
+
+Vercel runs Django as one serverless Python function: `api/index.py` exposes the WSGI app, `vercel.json`
+sends every path to it, and WhiteNoise serves `/static/` from inside the function. Vercel's disk is
+read-only and not kept between requests, so the database must be external (Neon); the app refuses to
+start on Vercel with SQLite.
+
+1. **Neon:** create a project and copy the **pooled** connection string (host contains `-pooler`).
+2. **Create the tables and the catalogue once**, from your machine, with that string in `.env` as
+   `DATABASE_URL`:
+
+   ```bash
+   python manage.py migrate
+   ```
+
+   ```bash
+   python manage.py seed_opportunities
+   ```
+
+3. **Vercel:** import the GitHub repository (Framework preset: Other), pick the branch, and add these
+   environment variables:
+
+   | Variable | Value |
+   |---|---|
+   | `DEBUG` | `False` |
+   | `DJANGO_SECRET_KEY` | a new long random value (not your local one) |
+   | `DATABASE_URL` | the Neon pooled connection string |
+   | `ALLOWED_HOSTS` | your custom domain, if any (Vercel's own URLs are allowed automatically) |
+   | `AI_PROVIDER`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_REASONING_EFFORT` | as in your `.env` |
+   | `CV_MAX_UPLOAD_MB` | `4` (Vercel rejects request bodies over 4.5 MB) |
+
+4. Deploy. Later schema changes: run `migrate` against Neon again before deploying.
+
+Notes: the function may run up to 60 s (`maxDuration` in `vercel.json`), which covers a slow live AI
+call (45 s timeout). The first request after a quiet period is slower (cold start). The retention
+purge (`purge_expired_data`) is not scheduled on Vercel; run it from your machine against Neon, or add a
+scheduled job. Static files are cache-busted by the deployed commit (`VERCEL_GIT_COMMIT_SHA`).
+
 ## Security and privacy for a real deployment
 
 This prototype has no accounts and is meant for fictional data. Beyond what is listed above, a real
@@ -392,7 +435,7 @@ deployment would need:
   not type, but it does show that someone submitted the same profile. This sharing is useful for the
   built-in sample profile; limiting it to the sample would remove the hint for real profiles.
 - Anyone holding a visitor's session cookie acts as that visitor (there are no accounts). Over plain HTTP
-  the cookie can be intercepted; a deployment needs HTTPS and secure cookies (see below).
+  the cookie can be intercepted; with `DEBUG` off the app forces HTTPS and secure cookies.
 - Live AI was checked by hand against Groq (CV extraction, three match assessments, the cache, the browser
   flow); the automated tests never call a provider.
 - `call_with_timeout` stops waiting at the timeout but cannot cancel an in-flight HTTP request.
