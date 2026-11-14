@@ -418,6 +418,7 @@ deployment would need:
 - **Other:** content security policy and self-hosted, bundled JavaScript (no in-browser Babel or
   third-party CDNs), dependency scanning, malware scanning of uploads, a DPIA for the CV feature.
 
+
 ## Known limitations
 
 - Skill matching is exact after normalisation with a small synonym map; related skills in other words
